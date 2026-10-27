@@ -1,0 +1,128 @@
+// DoIHaveMoney — v3 (PROPOSED, awaiting approval)
+// Changes from pasted base:
+//   + refresh_tokens, budgets, accounts (recommended)
+//   + transactions.account_id
+//   ~ money float -> numeric(14,2); FK string -> uuid; transactions.date datetime -> date
+
+TablePartial base {
+  id uuid [pk, default: `gen_random_uuid()`]
+  created_at datetime [not null, default: `now()`]
+  updated_at datetime [not null, default: `now()`]
+  deleted_at datetime [null]
+}
+
+Table users {
+  ~base
+  first_name varchar [not null]
+  last_name varchar [not null]
+  email varchar [not null, unique]
+}
+
+/*
+Table auth_providers{
+  id varchar pk
+  user_id uuid  [ref: - users.id]
+  name AuthProviderName
+}
+*/
+
+// Store only a hash of the token; rotation chains via replaced_by_id.
+Table refresh_tokens {
+  ~base
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar [not null, unique]
+  expires_at datetime [not null]
+  revoked_at datetime [null]
+  replaced_by_id uuid [null, ref: - refresh_tokens.id]
+
+  indexes {
+    user_id
+  }
+}
+
+// Where money sits. Balance = sum(transactions.amount) for the account.
+Table accounts {
+  ~base
+  user_id uuid [not null, ref: > users.id]
+  name varchar [not null]
+  type AccountType [not null]
+  archived_at datetime [null]
+
+  
+}
+
+// Money assigned to a category for one month. month = first day of the month.
+Table budgets {
+  ~base
+  user_id uuid [not null, ref: > users.id]
+  category_id uuid [not null, ref: > categories.id]
+  month date [not null]
+  amount numeric(14,2) [not null, default: 0]
+
+  indexes {
+    (user_id, category_id, month) [unique]
+  }
+}
+
+// amount: positive = inflow, negative = outflow.
+Table transactions {
+  ~base
+  user_id uuid [not null, ref: > users.id]
+  account_id uuid [not null, ref: > accounts.id]
+  category_id uuid [null, ref: > categories.id] // null = uncategorized
+  amount numeric(14,2) [not null]
+  description varchar
+  date date [not null]
+
+  indexes {
+    (user_id, date)
+    account_id
+    category_id
+  }
+}
+
+Table categories {
+  ~base
+  name varchar [not null]
+  type_id uuid [not null, ref: > category_type.id]
+  user_id uuid [null, ref: > users.id] // null = system default
+  parent_id uuid [null, ref: > categories.id]
+}
+
+Table category_type {
+  ~base
+  name varchar [not null, unique]
+}
+
+enum AccountType {
+  CASH
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+}
+
+enum AuthProviderName {
+  GOOGLE
+}
+Table recurring_payments {
+  ~base
+  user_id uuid [not null, ref: > users.id]
+  account_id uuid [not null, ref: > accounts.id]
+  category_id uuid [null, ref: > categories.id]
+  name varchar [not null]                 // "Car insurance", "Netflix"
+  amount numeric(14,2) [not null]         // negative = outflow
+  frequency Frequency [not null]
+  next_due_date date [not null]
+  ended_at timestamptz [null]             // cancelled subscription
+
+  indexes {
+    (user_id, next_due_date)
+  }
+}
+
+enum Frequency { 
+  WEEKLY 
+  MONTHLY 
+  QUARTERLY 
+  YEARLY
+   }

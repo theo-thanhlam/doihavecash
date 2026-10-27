@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: corporate --default;
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}

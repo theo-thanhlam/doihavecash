@@ -1,0 +1,7 @@
+.next
+node_modules
+drizzle
+next-env.d.ts
+package-lock.json
+TableDesign
+.claude
